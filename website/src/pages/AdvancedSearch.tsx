@@ -9,7 +9,11 @@ import SuggestionCard from '../components/SuggestionCard';
 import { DatePicker } from '../components/DatePicker';
 import { papers } from '../components/papers';
 import StatsPlot from '../components/StatsPlot';
+import StatTiles from '../components/StatTiles';
+import KeywordTrends from '../components/KeywordTrends';
+import PaperGraph from '../components/PaperGraph';
 import TimelinePlot, { type TimelineHandle } from '../components/Timeline';
+import { isBookmarked, onBookmarksChange } from '../utils/bookmarks';
 import './AdvancedSearch.css';
 
 type SearchBarConfig = {
@@ -28,12 +32,24 @@ export default function AdvancedSearch() {
   const [detailLevel, setDetailLevel] = useState<'mini' | 'small' | 'detail'>('detail');
   const [onlyWithCode, setOnlyWithCode] = useState(false);
   const [onlyReviewed, setOnlyReviewed] = useState(false);
+  const [onlyBookmarked, setOnlyBookmarked] = useState(Boolean(location.state?.bookmarked));
+  // Bumped whenever bookmarks change so an active "Bookmarked" filter re-runs.
+  const [bookmarkVersion, setBookmarkVersion] = useState(0);
+
+  useEffect(() => onBookmarksChange(() => setBookmarkVersion((v) => v + 1)), []);
+
+  // Navbar bookmark badge navigates here with state; sync when already on this page.
+  useEffect(() => {
+    if (location.state?.bookmarked) setOnlyBookmarked(true);
+  }, [location.state]);
   // Default to no explicit sort: papers already load oldest-first (see papers.tsx),
   // so the initial order is correct without a re-sort flash on load.
   const [sortBy, setSortBy] = useState('');
 
-  const [viewMode, setViewMode] = useState<'browse' | 'statistics' | 'timeline'>('browse');
-  const [statsMode, setStatsMode] = useState<'year' | 'venue' | 'keyword'>('year');
+  const [viewMode, setViewMode] = useState<'browse' | 'statistics' | 'timeline' | 'graph'>(
+    'browse'
+  );
+  const [statsMode, setStatsMode] = useState<'year' | 'venue' | 'keyword' | 'trends'>('year');
 
   // default bars
   const [searchBars, setSearchBars] = useState([
@@ -125,6 +141,11 @@ export default function AdvancedSearch() {
         (paper) => !String(paper['VENUE']).toLowerCase().includes('arxiv')
       );
     }
+    if (onlyBookmarked) {
+      // bookmarkVersion ties this filter to bookmark toggles (isBookmarked reads localStorage)
+      void bookmarkVersion;
+      advancedSugg = advancedSugg.filter((paper) => isBookmarked(paper['ID']));
+    }
     const searchMap = new Map();
     searchBars.forEach((bar) => {
       const field = bar.field;
@@ -198,7 +219,7 @@ export default function AdvancedSearch() {
       });
     }
     setSuggestions(advancedSugg);
-  }, [searchBars, onlyWithCode, onlyReviewed, sortBy]);
+  }, [searchBars, onlyWithCode, onlyReviewed, onlyBookmarked, bookmarkVersion, sortBy]);
 
   useEffect(() => {
     onSearch();
@@ -223,6 +244,28 @@ export default function AdvancedSearch() {
     id: number
   ) => {
     onUpdateBar(id, suggestionValue);
+  };
+
+  // Clicking a keyword chip on a card fills (or adds) a keyword search bar.
+  const handleKeywordClick = (term: string) => {
+    setSearchBars((prev) => {
+      const keywordBar = prev.find((bar) => bar.field === 'KEYWORD');
+      if (keywordBar) {
+        return prev.map((bar) => (bar.id === keywordBar.id ? { ...bar, value: term } : bar));
+      }
+      return [
+        ...prev,
+        {
+          id: nextId,
+          field: 'KEYWORD',
+          value: term,
+          placeholder: 'Search by keyword.',
+          option: 'Keyword',
+        },
+      ];
+    });
+    setNextId((prev) => prev + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const buildSearchBar = (bar: SearchBarConfig) => {
@@ -252,7 +295,14 @@ export default function AdvancedSearch() {
                 <SearchBar
                   field={bar.field}
                   placeholder={bar.placeholder}
-                  initialValue={isTitleBar ? bar.value : ''}
+                  // Keyword bars stay synced so keyword-chip clicks show up in the input.
+                  initialValue={
+                    isTitleBar || bar.field === 'KEYWORD'
+                      ? typeof bar.value === 'string'
+                        ? bar.value
+                        : ''
+                      : ''
+                  }
                   id={bar.id}
                   icon="X"
                   onSuggestionSelected={(event, data) =>
@@ -310,7 +360,7 @@ export default function AdvancedSearch() {
           variant={viewMode === 'statistics' ? 'primary' : 'outline-primary'}
           onClick={() => setViewMode('statistics')}
         >
-          Statistics
+          Year-by-Year
         </Button>
 
         <Button
@@ -319,6 +369,14 @@ export default function AdvancedSearch() {
           onClick={() => setViewMode('timeline')}
         >
           Timeline
+        </Button>
+
+        <Button
+          className="mx-2"
+          variant={viewMode === 'graph' ? 'primary' : 'outline-primary'}
+          onClick={() => setViewMode('graph')}
+        >
+          Connected Papers
         </Button>
       </div>
 
@@ -384,6 +442,19 @@ export default function AdvancedSearch() {
                 With code
               </label>
             </div>
+
+            <div className="d-flex align-items-center">
+              <input
+                type="checkbox"
+                id="bookmarkCheck"
+                checked={onlyBookmarked}
+                onChange={(e) => setOnlyBookmarked(e.target.checked)}
+                className="form-check-input m-0"
+              />
+              <label htmlFor="bookmarkCheck" className="form-check-label ms-1 mb-0">
+                Bookmarked
+              </label>
+            </div>
           </div>
         </Col>
 
@@ -414,9 +485,9 @@ export default function AdvancedSearch() {
               </ButtonGroup>
             )}
 
-            {/* Statistics: Year / Venue / Keyword */}
+            {/* Year-by-Year: chart selector */}
             {viewMode === 'statistics' && (
-              <ButtonGroup size="sm" className="w-100 w-md-auto">
+              <ButtonGroup size="sm" className="w-100 w-md-auto flex-wrap">
                 <Button
                   variant={statsMode === 'keyword' ? 'outline-secondary' : 'outline-primary'}
                   onClick={() => setStatsMode('keyword')}
@@ -434,6 +505,12 @@ export default function AdvancedSearch() {
                   onClick={() => setStatsMode('year')}
                 >
                   Year
+                </Button>
+                <Button
+                  variant={statsMode === 'trends' ? 'outline-secondary' : 'outline-primary'}
+                  onClick={() => setStatsMode('trends')}
+                >
+                  Trends
                 </Button>
               </ButtonGroup>
             )}
@@ -460,8 +537,20 @@ export default function AdvancedSearch() {
       {viewMode === 'statistics' ? (
         <Row>
           <Col xs={12}>
-            {/* You can use statsMode inside Venuestat to switch the visualization */}
-            <StatsPlot suggestions={suggestions} mode={statsMode} />
+            <div className="mb-4">
+              <StatTiles suggestions={suggestions} />
+            </div>
+            {statsMode === 'trends' ? (
+              <KeywordTrends suggestions={suggestions} />
+            ) : (
+              <StatsPlot suggestions={suggestions} mode={statsMode} />
+            )}
+          </Col>
+        </Row>
+      ) : viewMode === 'graph' ? (
+        <Row>
+          <Col xs={12}>
+            <PaperGraph suggestions={suggestions} />
           </Col>
         </Row>
       ) : viewMode === 'timeline' ? (
@@ -478,7 +567,12 @@ export default function AdvancedSearch() {
         // Browse: suggestion cards
         <Row>
           {suggestions.map((sugg) => (
-            <SuggestionCard key={sugg['ID']} sugg={sugg} detailLevel={detailLevel} />
+            <SuggestionCard
+              key={sugg['ID']}
+              sugg={sugg}
+              detailLevel={detailLevel}
+              onKeywordClick={handleKeywordClick}
+            />
           ))}
         </Row>
       )}
