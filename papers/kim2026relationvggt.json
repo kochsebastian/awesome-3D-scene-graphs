@@ -1,0 +1,14 @@
+{
+  "TITLE": "RelationVGGT: Visual Geometry Transformers for 3D Spatial Relation Segmentation",
+  "VENUE": "NeurIPS26",
+  "DATE": "2026/10/01",
+  "AUTHOR": "Minsu Kim, Jaesung Choe, Jiwoo Lee, Yu-Chiang Frank Wang, Seon Joo Kim",
+  "ABSTRACT": "RelationVGGT addresses relation-guided segmentation across unposed views of a 3D scene. Given a subject mask in one reference image and a textual relation, it identifies the related target in the remaining views without a target category label. The feed-forward model combines semantic and geometry-aware foundation-model features through a subject-conditioned relation transformer, avoiding scene-specific optimization and camera-pose inputs. An automated ScanNet++ annotation pipeline uses vision-language and language models, multi-view agreement, and geometric filtering to generate relation supervision. The approach supports open-vocabulary relational queries and generalization to unseen scenes.",
+  "ARXIV": "https://arxiv.org/abs/2610.00970",
+  "FIRSTINSTITUTE": "Yonsei University",
+  "KEYWORD": "Open-Vocabulary, Indoor, SUN, LLM, Dataset",
+  "SITE": "https://relationvggt.github.io/",
+  "CODE": "",
+  "VIDEO": "",
+  "BIBTEX": "@inproceedings{kim2026relationvggt,\n  title = {RelationVGGT: Visual Geometry Transformers for 3D Spatial Relation Segmentation},\n  author = {Kim, Minsu and Choe, Jaesung and Lee, Jiwoo and Wang, Yu-Chiang Frank and Kim, Seon Joo},\n  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},\n  year = {2026}\n}"
+}
